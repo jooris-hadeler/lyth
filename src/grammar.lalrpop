@@ -1,0 +1,281 @@
+use std::str::FromStr;
+use crate::ast::*;
+
+grammar(mod_name: &str, mod_file: &str);
+
+pub Module: Module = {
+    <module: Module> <func: Func> => {
+        let mut module = module;
+        module.funcs.push(func);
+        module
+    },
+    <module: Module> <struc: Struct> => {
+        let mut module = module;
+        module.types.push(struc);
+        module
+    },
+    <func: Func> => {
+        Module { name: mod_name.to_string(), file: mod_file.to_string(), funcs: vec![func], types: Vec::new() }
+    },
+    <typ: Struct> => {
+        Module { name: mod_name.to_string(), file: mod_file.to_string(), funcs: Vec::new(), types: vec![typ] }
+    }
+};
+
+pub Func: Function = {
+    "fn" <name: Ident> "(" <params: Params?> ")" <rtyp: Type?> <body: BlockStmt> => Function { name, params, rtyp, body }
+};
+
+Params: Vec<(String, Type)> = {
+    <param: Param> => vec![param],
+    <params: Params> "," <param: Param> => {
+        let mut p = params;
+        p.push(param);
+        p
+    }
+};
+
+Param: (String, Type) = {
+    <name: Ident> ":" <typ: Type> => (name, typ)
+};
+
+pub Struct: Struct = {
+    "struct" <name: Ident> "{" <fields: FieldList> "}" => Struct { name, fields }
+};
+
+FieldList: Vec<(String, Type)> = {
+    <field: Field> => vec![field],
+    <fields: FieldList> "," <field: Field> => {
+        let mut l = fields;
+        l.push(field);
+        l
+    }
+};
+
+Field: (String, Type) = {
+    Param
+};
+
+pub Stmt: Box<Stmt> = {
+    <e: Expr> ";" => Box::new(Stmt::Expression(e)),
+    LetStmt,
+    ReturnStmt,
+    IfStmt,
+    WhileStmt,
+    BlockStmt
+};
+
+LetStmt: Box<Stmt> = {
+    "let" <name: Ident> <typ: TypeWithSep?> "=" <value: Expr> ";" => Box::new(Stmt::Let(name, typ, value))
+};
+
+TypeWithSep: Type = {
+    ":" <typ: Type> => typ
+};
+
+ReturnStmt: Box<Stmt> = {
+    "return" <e: Expr?> ";" => Box::new(Stmt::Return(e))
+};
+
+WhileStmt: Box<Stmt> = {
+    "while" <cond: Expr> <body: BlockStmt> => Box::new(Stmt::While(cond, body))
+};
+
+IfStmt: Box<Stmt> = {
+    "if" <cond: Expr> <cons: BlockStmt> <elze: ElseStmt?> => Box::new(Stmt::If(cond, cons, elze))
+};
+
+ElseStmt: Box<Stmt> = {
+    "elif" <cond: Expr> <cons: BlockStmt> <elze: ElseStmt?> => Box::new(Stmt::If(cond, cons, elze)),
+    "else" <elze: BlockStmt> => elze
+};
+
+BlockStmt: Box<Stmt> = {
+    "{" <l: StmtList> "}" => Box::new(Stmt::Block(l))
+};
+
+StmtList: Vec<Box<Stmt>> = {
+    <s: Stmt> => vec![s],
+    <b: StmtList> <s: Stmt> => {
+        let mut p: Vec<Box<Stmt>> = b;
+        p.push(s);
+        p
+    }
+};
+
+Type: Type = {
+    "u8" => Type::U8,
+    "u16" => Type::U16,
+    "u32" => Type::U32,
+    "u64" => Type::U64,
+    "s8" => Type::S8,
+    "s16" => Type::S16,
+    "s32" => Type::S32,
+    "s64" => Type::S64,
+    "bool" => Type::Boolean,
+    <name: Ident> => Type::Custom(name),
+    "*" <t: Type> => Type::Pointer(Box::new(t))
+};
+
+pub Expr: Box<Expr> = {
+    <lhs: Expr> <op: AssignOp> <rhs: Expr12> => Box::new(Expr::Binary(op, lhs, rhs)),
+    Expr12
+};
+
+AssignOp: Operation = {
+    "=" => Operation::Assign,
+    "+=" => Operation::AddAssign,
+    "-=" => Operation::SubAssign,
+    "*=" => Operation::MulAssign,
+    "%=" => Operation::ModAssign,
+    "/=" => Operation::DivAssign,
+    "<<=" => Operation::ShlAssign,
+    ">>=" => Operation::ShrAssign,
+    "&=" => Operation::AndAssign,
+    "|=" => Operation::OrAssign,
+    "^=" => Operation::XorAssign
+};
+
+Expr12: Box<Expr> = {
+    <lhs: Expr12> "||" <rhs: Expr11> => Box::new(Expr::Binary(Operation::LogicalOr, lhs, rhs)),
+    Expr11
+};
+
+Expr11: Box<Expr> = {
+    <lhs: Expr11> "&&" <rhs: Expr10> => Box::new(Expr::Binary(Operation::LogicalAnd, lhs, rhs)),
+    Expr10
+};
+
+Expr10: Box<Expr> = {
+    <lhs: Expr10> <op: EqualityOp> <rhs: Expr9> => Box::new(Expr::Binary(op, lhs, rhs)),
+    Expr9
+};
+
+EqualityOp: Operation = {
+    "==" => Operation::Eq,
+    "!=" => Operation::Neq
+};
+
+Expr9: Box<Expr> = {
+    <lhs: Expr9> <op: RelationOp> <rhs: Expr8> => Box::new(Expr::Binary(op, lhs, rhs)),
+    Expr8
+};
+
+RelationOp: Operation = {
+    "<=" => Operation::Leq,
+    ">=" => Operation::Geq,
+    "<" => Operation::Lt,
+    ">" => Operation::Gt
+};
+
+Expr8: Box<Expr> = {
+    <lhs: Expr8> "^" <rhs: Expr7> => Box::new(Expr::Binary(Operation::Xor, lhs, rhs)),
+    Expr7
+};
+
+Expr7: Box<Expr> = {
+    <lhs: Expr7> "|" <rhs: Expr6> => Box::new(Expr::Binary(Operation::Or, lhs, rhs)),
+    Expr6
+};
+
+Expr6: Box<Expr> = {
+    <lhs: Expr6> "&" <rhs: Expr5> => Box::new(Expr::Binary(Operation::And, lhs, rhs)),
+    Expr5
+};
+
+Expr5: Box<Expr> = {
+    <lhs: Expr5> <op: BitshiftOp> <rhs: Expr4> => Box::new(Expr::Binary(op, lhs, rhs)),
+    Expr4
+};
+
+BitshiftOp: Operation = {
+    "<<" => Operation::Shl,
+    ">>" => Operation::Shr
+};
+
+Expr4: Box<Expr> = {
+    <lhs: Expr4> <op: BasicOp> <rhs: Expr3> => Box::new(Expr::Binary(op, lhs, rhs)),
+    Expr3
+};
+
+BasicOp: Operation = {
+    "+" => Operation::Add,
+    "-" => Operation::Sub
+};
+
+Expr3: Box<Expr> = {
+    <lhs: Expr3> <op: ComplexOp> <rhs: Expr2> => Box::new(Expr::Binary(op, lhs, rhs)),
+    Expr2
+};
+
+ComplexOp: Operation = {
+    "*" => Operation::Mul,
+    "/" => Operation::Div,
+    "%" => Operation::Mod
+};
+
+Expr2: Box<Expr> = {
+    <op: UnaryOp> <rhs: Expr1> => Box::new(Expr::Unary(op, rhs)),
+    Expr1
+};
+
+UnaryOp: Operation = {
+    "~" => Operation::Not,
+    "!" => Operation::LogicalNot,
+    "-" => Operation::Neg,
+    "*" => Operation::Deref,
+    "&" => Operation::AddrOf,
+};
+
+Expr1: Box<Expr> = {
+    <id: Expr0> "(" <params: CallParams?> ")" => Box::new(Expr::Call(id, params)),
+    Expr0
+};
+
+CallParams: Vec<Box<Expr>> = {
+    <e: Expr> => vec![e],
+    <p: CallParams> "," <e: Expr> => {
+        let mut v: Vec<Box<Expr>> = p;
+        v.push(e);
+        v
+    }
+};
+
+Expr0: Box<Expr> = {
+    <lhs: Expr0> "." <rhs: Ident> => Box::new(Expr::Member(lhs, rhs)),
+    <val: Literal> => Box::new(Expr::Literal(val)),
+    "(" <e: Expr> ")" => e,
+    Ident => Box::new(Expr::Identifier(<>))
+};
+
+Ident: String = {
+    r"[a-zA-Z_]+" => <>.to_string()
+};
+
+Literal: Lit = {
+    r"[0-9]+" => Lit::Integer(usize::from_str(<>).unwrap()),
+    r#"".+""# => {
+        let c = <>.to_string();
+        Lit::String(c[1..c.len()-1].to_string())
+    },
+    "true" => Lit::Boolean(true),
+    "false" => Lit::Boolean(false),
+    StructLiteral
+};
+
+StructLiteral: Lit = {
+    <name: Ident> "::" "{" <fields: FieldDefs> "}" => Lit::Struct(name, fields),
+};
+
+FieldDefs: Vec<(String, Box<Expr>)> = {
+    <field: FieldDef> => vec![field],
+    <fields: FieldDefs> "," <field: FieldDef> => {
+        let mut fields = fields;
+        fields.push(field);
+        fields
+    }
+};
+
+FieldDef: (String, Box<Expr>) = {
+    <name: Ident> ":" <value: Expr> => (name, value)
+};
