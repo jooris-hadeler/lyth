@@ -8,7 +8,7 @@ pub struct Module {
     /// Functions in the module
     pub funcs: Vec<Function>,
     /// Types in the module
-    pub types: Vec<Struct>
+    pub types: Vec<Struct>,
 }
 
 /// Representation of a Function
@@ -30,7 +30,7 @@ pub struct Struct {
     /// Name of the struct
     pub name: String,
     /// Fields of the struct
-    pub fields: Vec<Field>
+    pub fields: Vec<Field>,
 }
 
 /// Representation of a Field
