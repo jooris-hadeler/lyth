@@ -1,6 +1,6 @@
 use crate::{
     ast::{Expr, Lit, Operation},
-    grammar::ExprParser,
+    parser::ExprParser,
 };
 
 const MOD_NAME: &'static str = "<test>";

@@ -3,7 +3,7 @@ use std::fs::read_to_string;
 #[macro_use]
 extern crate lalrpop_util;
 
-lalrpop_mod!(pub grammar);
+lalrpop_mod!(pub parser);
 mod ast;
 
 #[cfg(test)]
@@ -14,7 +14,7 @@ fn main() {
     let mod_name = module_name(file);
     let content = read_to_string(file).expect("couldn't read file");
 
-    let func = grammar::ModuleParser::new()
+    let func = parser::ModuleParser::new()
         .parse(mod_name.as_str(), file, content.as_str())
         .unwrap();
 
