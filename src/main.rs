@@ -1,21 +1,23 @@
 use std::fs::read_to_string;
 
+use structopt::StructOpt;
+
 #[macro_use]
 extern crate lalrpop_util;
 
 lalrpop_mod!(pub parser);
 mod ast;
+mod cli;
 
 #[cfg(test)]
 mod test;
 
 fn main() {
-    let file = "test.ly";
-    let mod_name = module_name(file);
-    let content = read_to_string(file).expect("couldn't read file");
+    let options = cli::Options::from_args();
 
+    let content = read_to_string(&options.input).expect("couldn't read file");
     let func = parser::ModuleParser::new()
-        .parse(mod_name.as_str(), file, content.as_str())
+        .parse(&module_name(&options.input), &options.input, content.as_str())
         .unwrap();
 
     println!("{:#?}", func);
