@@ -1,7 +1,7 @@
 fn exit(code: i32);
 
-fn hello(name: str, age: u8) -> str {
+fn calc_age(age: u8) -> i32 {
     let new_age: i32 = age * 3 + 7;
 
-    return;
+    return new_age;
 }

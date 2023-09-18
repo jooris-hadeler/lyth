@@ -1,5 +1,5 @@
 use crate::lexer::{Location, Token, TokenKind};
-use crate::parser::ast::{BinaryOp, ExprKind, Param, StmtKind, UnaryOp};
+use crate::parser::ast::{BinaryOp, ExprKind, Param, StmtKind, StructField, UnaryOp};
 
 use thiserror::Error;
 
@@ -108,12 +108,14 @@ impl Parser {
 
     pub fn parse_module(&mut self) -> Result<ast::Module, ParserError> {
         let mut functions = Vec::new();
+        let mut types = Vec::new();
 
         while !self.is_peek(0, TokenKind::Eof) {
             match self.peek(0) {
                 Some(tok) => match tok.kind {
-                    TokenKind::Fn => functions.push(self.parse_function()?),
-                    _ => unimplemented!()
+                    TokenKind::Fn => functions.push(self.parse_func_def()?),
+                    TokenKind::Struct => types.push(self.parse_struct_def()?),
+                    _ => unimplemented!("unimplemented token kind: {:?}", tok.kind)
                 },
                 None => break,
             }
@@ -122,10 +124,61 @@ impl Parser {
         Ok(ast::Module {
             file: self.file.clone(),
             functions,
+            types,
         })
     }
 
-    pub fn parse_function(&mut self) -> Result<ast::Function, ParserError> {
+    pub fn parse_struct_def(&mut self) -> Result<ast::TypeDef, ParserError> {
+        self.try_consume_with_error(TokenKind::Struct, "expected keyword `struct`")?;
+
+        let (name, loc) = extract_identifier!(self.try_consume_predicate_with_error(
+            |tok| matches!(tok.kind, TokenKind::Identifier(..)),
+            "expected identifier after `struct` keyword"
+        )?);
+
+        let fields = self.parse_struct_body()?;
+
+        Ok(ast::TypeDef::Struct(ast::TypeDefStruct {
+            name,
+            fields,
+            loc,
+        }))
+    }
+
+    pub fn parse_struct_body(&mut self) -> Result<Vec<StructField>, ParserError> {
+        let mut fields = Vec::new();
+
+        self.try_consume_with_error(TokenKind::LBrace, "expected `{` at beginning of struct body")?;
+
+        if self.is_peek_predicate(0, |tok| matches!(tok.kind, TokenKind::Identifier(..))) {
+            loop {
+                fields.push(self.parse_struct_field()?);
+
+                if self.is_peek(0, TokenKind::Comma) {
+                    self.consume()?;
+                } else { break; }
+            }
+        }
+
+        self.try_consume_with_error(TokenKind::RBrace, "expected `}` at end of struct body")?;
+
+        Ok(fields)
+    }
+
+    pub fn parse_struct_field(&mut self) -> Result<StructField, ParserError> {
+        let (name, loc) = extract_identifier!(self.try_consume_predicate_with_error(
+            |tok| matches!(tok.kind, TokenKind::Identifier(..)),
+            "expected identifier after `struct` keyword"
+        )?);
+
+        self.try_consume_with_error(TokenKind::Colon, "expected `:` after field name")?;
+
+        let typ = self.parse_type()?;
+
+        Ok((name, loc, typ))
+    }
+
+    pub fn parse_func_def(&mut self) -> Result<ast::FuncDef, ParserError> {
         self.try_consume_with_error(TokenKind::Fn, "expected keyword `fn`")?;
 
         let (name, loc) = extract_identifier!(self.try_consume_predicate_with_error(
@@ -153,7 +206,7 @@ impl Parser {
             Some(self.parse_block()?)
         };
 
-        Ok(ast::Function {
+        Ok(ast::FuncDef {
             name,
             params,
             return_type,
@@ -214,10 +267,22 @@ impl Parser {
                 TokenKind::Let => self.parse_let_stmt(),
                 TokenKind::Return => self.parse_return_stmt(),
 
-                _ => unimplemented!()
+                _ => self.parse_expr_stmt(),
             }
             None => return Err(ParserError::Message("unexpected end of file".into())),
         }
+    }
+
+    pub fn parse_expr_stmt(&mut self) -> Result<ast::Stmt, ParserError> {
+        let expr = self.parse_expression(Precedence::Lowest)?;
+        let loc = expr.loc.clone();
+
+        self.try_consume_with_error(TokenKind::SemiColon, "expected `;` after an expression")?;
+
+        Ok(ast::Stmt {
+            kind: StmtKind::Expr(expr),
+            loc,
+        })
     }
 
     pub fn parse_let_stmt(&mut self) -> Result<ast::Stmt, ParserError> {
@@ -280,8 +345,9 @@ impl Parser {
                 TokenKind::Plus | TokenKind::Minus => Precedence::Sum,
                 TokenKind::Asterisk | TokenKind::Slash => Precedence::Product,
                 TokenKind::Equal | TokenKind::Unequal => Precedence::Equality,
+                TokenKind::LParen => Precedence::Call,
 
-                _ => Precedence::Lowest,
+                _ => Precedence::Highest,
             }
             None => Precedence::Lowest
         }
@@ -292,6 +358,7 @@ impl Parser {
         let mut left = match self.peek(0) {
             Some(token) => match token.kind {
                 TokenKind::Integer(..) => self.parse_integer_literal()?,
+                TokenKind::True | TokenKind::False => self.parse_boolean_literal()?,
                 TokenKind::Identifier(..) => self.parse_identifier()?,
 
                 TokenKind::Minus => self.parse_prefix_expression()?,
@@ -313,6 +380,7 @@ impl Parser {
                     | TokenKind::Slash
                     | TokenKind::Equal
                     | TokenKind::Unequal => self.parse_infix_expression(left)?,
+                    TokenKind::LParen => self.parse_call_expression(left)?,
 
                     _ => return Ok(left),
                 }
@@ -321,6 +389,49 @@ impl Parser {
         }
 
         Ok(left)
+    }
+
+    pub fn parse_call_expression(&mut self, func: ast::Expr) -> Result<ast::Expr, ParserError> {
+        self.try_consume_with_error(TokenKind::LParen, "expected `(` after function")?;
+
+        let params = self.parse_call_params()?;
+
+        self.try_consume_with_error(TokenKind::RParen, "expected `)` after call params")?;
+
+        let loc = func.loc.clone();
+
+        Ok(ast::Expr {
+            kind: ExprKind::Call(Box::new(func), params),
+            loc,
+        })
+    }
+
+    pub fn parse_call_params(&mut self) -> Result<Vec<ast::Expr>, ParserError> {
+        let mut params = Vec::new();
+
+        if self.is_peek(0, TokenKind::RParen) {
+            return Ok(params);
+        }
+
+        loop {
+            params.push(self.parse_expression(Precedence::Lowest)?);
+
+            if self.is_peek(0, TokenKind::Comma) { self.consume()?; } else { break; }
+        }
+
+        Ok(params)
+    }
+
+    pub fn parse_boolean_literal(&mut self) -> Result<ast::Expr, ParserError> {
+        let tok = self.try_consume_predicate_with_error(
+            |tok| matches!(tok.kind, TokenKind::True | TokenKind::False),
+            "expected `true` or `false`",
+        )?;
+
+        Ok(ast::Expr {
+            kind: ExprKind::Boolean(tok.kind == TokenKind::True),
+            loc: tok.loc.clone(),
+        })
     }
 
     pub fn parse_integer_literal(&mut self) -> Result<ast::Expr, ParserError> {

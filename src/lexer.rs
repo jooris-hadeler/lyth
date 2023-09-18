@@ -53,6 +53,8 @@ pub enum TokenKind {
     Break,
     Struct,
     Return,
+    True,
+    False,
 
     // Literals & Identifier
     Identifier(Box<str>),
@@ -148,6 +150,8 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Result<Vec<Token>, (
                             "break" => TokenKind::Break,
                             "struct" => TokenKind::Struct,
                             "return" => TokenKind::Return,
+                            "true" => TokenKind::True,
+                            "false" => TokenKind::False,
                             default => TokenKind::Identifier(default.into()),
                         }
                     }
