@@ -79,7 +79,7 @@ impl Debug for Location {
     }
 }
 
-pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Result<Vec<Token>, ()> {
+pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut pos: usize = 0;
 
@@ -229,5 +229,5 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Result<Vec<Token>, (
         },
     });
 
-    Ok(tokens)
+    tokens
 }
