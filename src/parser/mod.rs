@@ -38,10 +38,13 @@ pub struct Parser {
 }
 
 impl Parser {
+    /// This function constructs a new Parser from a vector of Tokens and the file path.
     pub fn new(tokens: Vec<Token>, file: Box<str>) -> Self {
         Self { tokens, index: 0, file }
     }
 
+    /// This function `consumes` a Token,
+    /// this means it returns the token and increments the index.
     fn consume(&mut self) -> Result<Token, ParserError> {
         let token = self.tokens.get(self.index)
             .ok_or(ParserError::Message("Unexpected end of file.".into()))?.clone();
@@ -51,18 +54,23 @@ impl Parser {
         Ok(token)
     }
 
+    /// This function returns a copy of a Token at index + offset.
     fn peek(&self, offset: usize) -> Option<Token> {
         self.tokens.get(self.index + offset).cloned()
     }
 
+    /// This function allows checks on a peek Token using a predicate.
     fn is_peek_predicate(&self, offset: usize, predicate: impl FnOnce(Token) -> bool) -> bool {
         self.peek(offset).is_some_and(predicate)
     }
 
+    /// This function allows checks if a Token is of certain kind.
     fn is_peek(&self, offset: usize, kind: TokenKind) -> bool {
         self.is_peek_predicate(offset, |tok| tok.kind == kind)
     }
 
+    /// This function tries to consume a Token if it
+    /// matches a predicate, otherwise it returns an Error.
     fn try_consume_predicate_with_error<S: Into<Box<str>>>(&mut self, predicate: impl FnOnce(Token) -> bool, msg: S) -> Result<Token, ParserError> {
         if self.peek(0).is_some_and(predicate) {
             self.consume()
@@ -77,6 +85,10 @@ impl Parser {
         }
     }
 
+    /// This function tries to consume a Token if it
+    /// matches a predicate otherwise it returns None.
+    ///
+    /// WARNING: consuming the Token can still return an error.
     fn try_consume_predicate(&mut self, predicate: impl FnOnce(Token) -> bool) -> Result<Option<Token>, ParserError> {
         if self.peek(0).is_some_and(predicate) {
             Ok(Some(self.consume()?))
@@ -85,14 +97,20 @@ impl Parser {
         }
     }
 
+    /// This function tries to consume a Token of certain kind,
+    /// otherwise it returns an error.
     fn try_consume_with_error<S: Into<Box<str>>>(&mut self, kind: TokenKind, err: S) -> Result<Token, ParserError> {
         self.try_consume_predicate_with_error(|tok| tok.kind == kind, err)
     }
 
+    /// This function tries to consume an error of certain kind,
+    /// otherwise it returns None.
     fn try_consume(&mut self, kind: TokenKind) -> Result<Option<Token>, ParserError> {
         self.try_consume_predicate(|tok| tok.kind == kind)
     }
 
+    /// This function tries to consume an identifier, it returns
+    /// the literal of the identifier and the location.
     fn try_consume_identifier<S: Into<Box<str>>>(&mut self, msg: S) -> Result<(Box<str>, Location), ParserError> {
         let token = self.try_consume_predicate_with_error(
             |tok| matches!(tok.kind, TokenKind::Identifier(..)),
@@ -105,6 +123,7 @@ impl Parser {
         Ok((name, loc))
     }
 
+    /// This function parses a module.
     pub fn parse_module(&mut self) -> Result<ast::Module, ParserError> {
         let mut functions = Vec::new();
         let mut types = Vec::new();
@@ -127,6 +146,7 @@ impl Parser {
         })
     }
 
+    /// This function parses a StructDef.
     pub fn parse_struct_def(&mut self) -> Result<ast::TypeDef, ParserError> {
         self.try_consume_with_error(TokenKind::Struct, "expected keyword `struct`")?;
 
@@ -141,6 +161,7 @@ impl Parser {
         }))
     }
 
+    /// This function parses the struct body.
     pub fn parse_struct_body(&mut self) -> Result<Vec<StructField>, ParserError> {
         let mut fields = Vec::new();
 
@@ -161,6 +182,7 @@ impl Parser {
         Ok(fields)
     }
 
+    /// This function parses a struct field.
     pub fn parse_struct_field(&mut self) -> Result<StructField, ParserError> {
         let (name, loc) = self.try_consume_identifier("expected identifier after `struct` keyword")?;
 
@@ -171,6 +193,7 @@ impl Parser {
         Ok((name, loc, typ))
     }
 
+    /// This function parses a FuncDef.
     pub fn parse_func_def(&mut self) -> Result<ast::FuncDef, ParserError> {
         self.try_consume_with_error(TokenKind::Fn, "expected keyword `fn`")?;
 
@@ -205,6 +228,7 @@ impl Parser {
         })
     }
 
+    /// This function parses function parameters.
     pub fn parse_function_params(&mut self) -> Result<Vec<ast::Param>, ParserError> {
         let mut params = Vec::new();
 
@@ -225,12 +249,14 @@ impl Parser {
         Ok(params)
     }
 
+    /// This function parses a type.
     pub fn parse_type(&mut self) -> Result<ast::Type, ParserError> {
         let (name, loc) = self.try_consume_identifier("expected identifier as type")?;
 
         Ok(ast::Type { name, loc })
     }
 
+    /// This function parses a block.
     pub fn parse_block(&mut self) -> Result<ast::Block, ParserError> {
         let mut stmts = Vec::new();
 
@@ -245,6 +271,7 @@ impl Parser {
         Ok(ast::Block(stmts))
     }
 
+    /// This function parses a statement.
     pub fn parse_stmt(&mut self) -> Result<ast::Stmt, ParserError> {
         match self.peek(0) {
             Some(token) => match token.kind {
@@ -257,6 +284,7 @@ impl Parser {
         }
     }
 
+    /// This function parses an expression statement.
     pub fn parse_expr_stmt(&mut self) -> Result<ast::Stmt, ParserError> {
         let expr = self.parse_expression(Precedence::Lowest)?;
         let loc = expr.loc.clone();
@@ -269,6 +297,7 @@ impl Parser {
         })
     }
 
+    /// This function parses a let statement.
     pub fn parse_let_stmt(&mut self) -> Result<ast::Stmt, ParserError> {
         self.try_consume_with_error(TokenKind::Let, "expected `let` keyword")?;
 
@@ -300,6 +329,7 @@ impl Parser {
         })
     }
 
+    /// This function parses a return statement.
     pub fn parse_return_stmt(&mut self) -> Result<ast::Stmt, ParserError> {
         let tok = self.try_consume_with_error(TokenKind::Return, "expected `return`")?;
 
@@ -320,6 +350,7 @@ impl Parser {
         })
     }
 
+    /// This function returns the precedence of the Token at position index + offset.
     fn peek_precedence(&self, offset: usize) -> Precedence {
         match self.peek(offset) {
             Some(token) => match token.kind {
@@ -334,6 +365,9 @@ impl Parser {
         }
     }
 
+    /// This function parses an expression.
+    ///
+    /// param `precedence`: The precedence of the current expression.
     pub fn parse_expression(&mut self, precedence: Precedence) -> Result<ast::Expr, ParserError> {
         // this parses all prefix operations like -x or !x
         let mut left = match self.peek(0) {
@@ -372,6 +406,7 @@ impl Parser {
         Ok(left)
     }
 
+    /// This function parses a call expression.
     pub fn parse_call_expression(&mut self, func: ast::Expr) -> Result<ast::Expr, ParserError> {
         self.try_consume_with_error(TokenKind::LParen, "expected `(` after function")?;
 
@@ -387,6 +422,7 @@ impl Parser {
         })
     }
 
+    /// This function parses call parameters.
     pub fn parse_call_params(&mut self) -> Result<Vec<ast::Expr>, ParserError> {
         let mut params = Vec::new();
 
@@ -403,6 +439,7 @@ impl Parser {
         Ok(params)
     }
 
+    /// This function parses a boolean literal.
     pub fn parse_boolean_literal(&mut self) -> Result<ast::Expr, ParserError> {
         let tok = self.try_consume_predicate_with_error(
             |tok| matches!(tok.kind, TokenKind::True | TokenKind::False),
@@ -415,6 +452,7 @@ impl Parser {
         })
     }
 
+    /// This function parses an integer literal.
     pub fn parse_integer_literal(&mut self) -> Result<ast::Expr, ParserError> {
         let tok = self.try_consume_predicate_with_error(
             |tok| matches!(tok.kind, TokenKind::Integer(..)),
@@ -432,6 +470,7 @@ impl Parser {
         })
     }
 
+    /// This function parses an identifier literal in an expression.
     pub fn parse_identifier(&mut self) -> Result<ast::Expr, ParserError> {
         let ident = self.try_consume_predicate_with_error(
             |tok| matches!(tok.kind, TokenKind::Identifier(..)),
@@ -449,6 +488,7 @@ impl Parser {
         })
     }
 
+    /// This function parses a prefix expression.
     pub fn parse_prefix_expression(&mut self) -> Result<ast::Expr, ParserError> {
         let (mut loc, op) = match self.peek(0) {
             Some(token) => (token.loc.clone(), match token.kind {
@@ -474,6 +514,9 @@ impl Parser {
         })
     }
 
+    /// This function parses an infix expression.
+    ///
+    /// param `left`: the left side of the infix expression
     pub fn parse_infix_expression(&mut self, left: ast::Expr) -> Result<ast::Expr, ParserError> {
         let op = match self.peek(0) {
             Some(token) => match token.kind {
