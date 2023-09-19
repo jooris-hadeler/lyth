@@ -66,6 +66,16 @@ pub enum TokenKind {
     Eof,
 }
 
+impl TokenKind {
+    pub fn unwrap_illegal(self) -> Box<str> {
+        if let TokenKind::Illegal(msg) = self {
+            msg
+        } else {
+            panic!("failed to unwrap TokenKind::Illegal variant");
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Location {
     pub file: Box<str>,
@@ -79,7 +89,7 @@ impl Debug for Location {
     }
 }
 
-pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Result<Vec<Token>, ()> {
+pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut pos: usize = 0;
 
@@ -229,5 +239,5 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Result<Vec<Token>, (
         },
     });
 
-    Ok(tokens)
+    tokens
 }
