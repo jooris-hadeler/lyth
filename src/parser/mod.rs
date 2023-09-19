@@ -17,19 +17,6 @@ pub enum ParserError {
     },
 }
 
-macro_rules! extract_identifier {
-    ($tok:expr) => {
-        {
-            let expanded = $tok;
-
-            match expanded.kind {
-                TokenKind::Identifier(ident) => (ident.clone(), expanded.loc.clone()),
-                _ => unreachable!("this shouldn't happen")
-            }
-        }
-    };
-}
-
 #[derive(Debug, Copy, Clone, PartialOrd, PartialEq)]
 pub enum Precedence {
     Lowest,
@@ -106,6 +93,18 @@ impl Parser {
         self.try_consume_predicate(|tok| tok.kind == kind)
     }
 
+    fn try_consume_identifier<S: Into<Box<str>>>(&mut self, msg: S) -> Result<(Box<str>, Location), ParserError> {
+        let token = self.try_consume_predicate_with_error(
+            |tok| matches!(tok.kind, TokenKind::Identifier(..)),
+            msg.into()
+        )?;
+
+        let name = token.kind.unwrap_identifier();
+        let loc = token.loc.clone();
+
+        Ok((name, loc))
+    }
+
     pub fn parse_module(&mut self) -> Result<ast::Module, ParserError> {
         let mut functions = Vec::new();
         let mut types = Vec::new();
@@ -131,10 +130,7 @@ impl Parser {
     pub fn parse_struct_def(&mut self) -> Result<ast::TypeDef, ParserError> {
         self.try_consume_with_error(TokenKind::Struct, "expected keyword `struct`")?;
 
-        let (name, loc) = extract_identifier!(self.try_consume_predicate_with_error(
-            |tok| matches!(tok.kind, TokenKind::Identifier(..)),
-            "expected identifier after `struct` keyword"
-        )?);
+        let (name, loc) = self.try_consume_identifier("expected identifier after `struct` keyword")?;
 
         let fields = self.parse_struct_body()?;
 
@@ -166,10 +162,7 @@ impl Parser {
     }
 
     pub fn parse_struct_field(&mut self) -> Result<StructField, ParserError> {
-        let (name, loc) = extract_identifier!(self.try_consume_predicate_with_error(
-            |tok| matches!(tok.kind, TokenKind::Identifier(..)),
-            "expected identifier after `struct` keyword"
-        )?);
+        let (name, loc) = self.try_consume_identifier("expected identifier after `struct` keyword")?;
 
         self.try_consume_with_error(TokenKind::Colon, "expected `:` after field name")?;
 
@@ -181,10 +174,7 @@ impl Parser {
     pub fn parse_func_def(&mut self) -> Result<ast::FuncDef, ParserError> {
         self.try_consume_with_error(TokenKind::Fn, "expected keyword `fn`")?;
 
-        let (name, loc) = extract_identifier!(self.try_consume_predicate_with_error(
-            |tok| matches!(tok.kind, TokenKind::Identifier(..)),
-            "expected identifier after `fn` keyword"
-        )?);
+        let (name, loc) = self.try_consume_identifier("expected identifier after `fn` keyword")?;
 
         self.try_consume_with_error(TokenKind::LParen, "expected `(` after function name")?;
 
@@ -219,10 +209,7 @@ impl Parser {
         let mut params = Vec::new();
 
         while !self.is_peek(0, TokenKind::RParen) {
-            let (name, loc) = extract_identifier!(self.try_consume_predicate_with_error(
-                |tok| matches!(tok.kind, TokenKind::Identifier(..)),
-                "expected identifier as parameter name"
-            )?);
+            let (name, loc) = self.try_consume_identifier("expected identifier as parameter name")?;
 
             self.try_consume_with_error(TokenKind::Colon, "expected `:` after parameter name")?;
 
@@ -239,10 +226,7 @@ impl Parser {
     }
 
     pub fn parse_type(&mut self) -> Result<ast::Type, ParserError> {
-        let (name, loc) = extract_identifier!(self.try_consume_predicate_with_error(
-            |tok| matches!(tok.kind, TokenKind::Identifier(..)),
-            "expected identifier as type"
-        )?);
+        let (name, loc) = self.try_consume_identifier("expected identifier as type")?;
 
         Ok(ast::Type { name, loc })
     }
@@ -288,10 +272,7 @@ impl Parser {
     pub fn parse_let_stmt(&mut self) -> Result<ast::Stmt, ParserError> {
         self.try_consume_with_error(TokenKind::Let, "expected `let` keyword")?;
 
-        let (name, loc) = extract_identifier!(self.try_consume_predicate_with_error(
-            |tok| matches!(tok.kind, TokenKind::Identifier(..)),
-            "expected identifier after `fn` keyword"
-        )?);
+        let (name, loc) = self.try_consume_identifier("expected identifier after `fn` keyword")?;
 
         let typ = if self.is_peek(0, TokenKind::Colon) {
             self.consume()?;

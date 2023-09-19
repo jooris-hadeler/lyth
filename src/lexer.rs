@@ -67,11 +67,19 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
-    pub fn unwrap_illegal(self) -> Box<str> {
+    pub fn unwrap_illegal(&self) -> Box<str> {
         if let TokenKind::Illegal(msg) = self {
-            msg
+            msg.clone()
         } else {
             panic!("failed to unwrap TokenKind::Illegal variant");
+        }
+    }
+
+    pub fn unwrap_identifier(&self) -> Box<str> {
+        if let TokenKind::Identifier(msg) = self {
+            msg.clone()
+        } else {
+            panic!("failed to unwrap TokenKind::Identifier variant");
         }
     }
 }
