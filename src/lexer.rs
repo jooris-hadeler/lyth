@@ -67,6 +67,7 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
+    /// This function unwraps the value of Illegal if the kind is already known.
     pub fn unwrap_illegal(&self) -> Box<str> {
         if let TokenKind::Illegal(msg) = self {
             msg.clone()
@@ -75,6 +76,7 @@ impl TokenKind {
         }
     }
 
+    /// This function unwraps the value of Identifier if the kind is already known.
     pub fn unwrap_identifier(&self) -> Box<str> {
         if let TokenKind::Identifier(msg) = self {
             msg.clone()
@@ -97,10 +99,12 @@ impl Debug for Location {
     }
 }
 
+/// This function lexes a file and returns a vector of Tokens.
 pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut pos: usize = 0;
 
+    /// This macro decides what do based on the next char.
     macro_rules! decide_on_next {
         ($cond:expr, $then:expr, $alt:expr) => {
             if content.peek().is_some_and(|c| *c == $cond) {
@@ -114,6 +118,7 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
     }
 
     loop {
+        // skip whitespace
         while content.peek().is_some_and(|c| c.is_whitespace()) {
             content.next();
             pos += 1;
@@ -146,6 +151,7 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
                     ':' => decide_on_next!(':', TokenKind::DColon, TokenKind::Colon),
                     ';' => TokenKind::SemiColon,
 
+                    // identifiers
                     'a'..='z' | 'A'..='Z' | '_' => {
                         let mut ident = String::from(c);
 
@@ -174,6 +180,7 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
                         }
                     }
 
+                    // integers
                     '0'..='9' => {
                         let mut number = String::from(c);
 
@@ -207,6 +214,7 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
                         }
                     }
 
+                    // strings
                     '"' => {
                         let mut value = String::new();
 
