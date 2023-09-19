@@ -28,6 +28,7 @@ fn calculate_pos(loc: &Location, content: &str) -> (usize, usize) {
 fn print_usage(executable: String) {
     eprintln!("usage: {executable} <subcommand>\n");
     eprintln!("SUBCOMMANDS:");
+    eprintln!("\tlex <file>");
     eprintln!("\tparse <file>");
 }
 
@@ -38,6 +39,20 @@ fn main() {
 
     match args.next() {
         Some(string) => match string.as_str() {
+            "lex" => {
+                let file = args.next().unwrap_or_else(|| {
+                    print_usage(executable);
+                    exit(2);
+                });
+
+                let content = fs::read_to_string(&file).unwrap();
+
+                if let Ok(tokens) = lex(&file, content.chars().peekable()) {
+                    for token in tokens {
+                        println!("{:?}", token);
+                    }
+                }
+            }
             "parse" => {
                 let file = args.next().unwrap_or_else(|| {
                     print_usage(executable);
