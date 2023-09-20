@@ -21,12 +21,21 @@ pub enum ParserError {
 pub enum Precedence {
     Lowest,
 
+    Assign,
+    LogicalOr,
+    LogicalAnd,
+    BitwiseOr,
+    BitwiseXor,
+    BitwiseAnd,
     Equality,
+    Order,
+    Shift,
     Sum,
     Product,
 
     Call,
     Index,
+    Access,
 
     Highest,
 }
@@ -354,10 +363,31 @@ impl Parser {
     fn peek_precedence(&self, offset: usize) -> Precedence {
         match self.peek(offset) {
             Some(token) => match token.kind {
-                TokenKind::Plus | TokenKind::Minus => Precedence::Sum,
-                TokenKind::Asterisk | TokenKind::Slash => Precedence::Product,
-                TokenKind::Equal | TokenKind::Unequal => Precedence::Equality,
+                TokenKind::Plus
+                | TokenKind::Minus => Precedence::Sum,
+
+                TokenKind::Asterisk
+                | TokenKind::Slash => Precedence::Product,
+
+                TokenKind::Equal
+                | TokenKind::Unequal => Precedence::Equality,
+
+                TokenKind::LessThan
+                | TokenKind::LessEqual
+                | TokenKind::GreaterThan
+                | TokenKind::GreaterEqual => Precedence::Order,
+
+                TokenKind::ShiftLeft
+                | TokenKind::ShiftRight => Precedence::Shift,
+
+                TokenKind::Ampersand => Precedence::BitwiseAnd,
+                TokenKind::Pipe => Precedence::BitwiseOr,
+                TokenKind::Caret => Precedence::BitwiseXor,
+                TokenKind::DAmpersand => Precedence::LogicalAnd,
+                TokenKind::DPipe => Precedence::LogicalOr,
+                TokenKind::Assign => Precedence::Assign,
                 TokenKind::LParen => Precedence::Call,
+                TokenKind::Dot => Precedence::Access,
 
                 _ => Precedence::Highest,
             }
@@ -394,7 +424,21 @@ impl Parser {
                     | TokenKind::Asterisk
                     | TokenKind::Slash
                     | TokenKind::Equal
-                    | TokenKind::Unequal => self.parse_infix_expression(left)?,
+                    | TokenKind::Unequal
+                    | TokenKind::Ampersand
+                    | TokenKind::Pipe
+                    | TokenKind::Caret
+                    | TokenKind::DAmpersand
+                    | TokenKind::DPipe
+                    | TokenKind::ShiftLeft
+                    | TokenKind::ShiftRight
+                    | TokenKind::LessThan
+                    | TokenKind::LessEqual
+                    | TokenKind::GreaterThan
+                    | TokenKind::GreaterEqual
+                    | TokenKind::Assign
+                    | TokenKind::Dot => self.parse_infix_expression(left)?,
+
                     TokenKind::LParen => self.parse_call_expression(left)?,
 
                     _ => return Ok(left),
@@ -526,6 +570,19 @@ impl Parser {
                 TokenKind::Slash => BinaryOp::Divide,
                 TokenKind::Equal => BinaryOp::Equals,
                 TokenKind::Unequal => BinaryOp::Unequals,
+                TokenKind::Ampersand => BinaryOp::BinaryAnd,
+                TokenKind::Pipe => BinaryOp::BinaryOr,
+                TokenKind::Caret => BinaryOp::BinaryXor,
+                TokenKind::DAmpersand => BinaryOp::LogicalAnd,
+                TokenKind::DPipe => BinaryOp::LogicalOr,
+                TokenKind::ShiftLeft => BinaryOp::ShiftLeft,
+                TokenKind::ShiftRight => BinaryOp::ShiftRight,
+                TokenKind::LessThan => BinaryOp::LessThan,
+                TokenKind::LessEqual => BinaryOp::LessEqual,
+                TokenKind::GreaterThan => BinaryOp::GreaterThan,
+                TokenKind::GreaterEqual => BinaryOp::GreaterEqual,
+                TokenKind::Assign => BinaryOp::Assign,
+                TokenKind::Dot => BinaryOp::Access,
 
                 // this should not happen
                 // this is most likely a result of this function

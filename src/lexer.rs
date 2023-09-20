@@ -20,8 +20,16 @@ pub enum TokenKind {
     Caret,
     Bang,
 
+    ShiftLeft,
+    ShiftRight,
+
     Equal,
     Unequal,
+
+    LessThan,
+    GreaterThan,
+    LessEqual,
+    GreaterEqual,
 
     Assign,
     Dot,
@@ -138,6 +146,10 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
                     '^' => TokenKind::Caret,
                     '!' => decide_on_next!('=', TokenKind::Unequal, TokenKind::Bang),
                     '=' => decide_on_next!('=', TokenKind::Equal, TokenKind::Assign),
+                    '<' => decide_on_next!('=', TokenKind::LessEqual,
+                        decide_on_next!('<', TokenKind::ShiftLeft, TokenKind::LessThan)),
+                    '>' => decide_on_next!('=', TokenKind::GreaterEqual,
+                        decide_on_next!('>', TokenKind::ShiftRight, TokenKind::GreaterThan)),
 
                     '(' => TokenKind::LParen,
                     ')' => TokenKind::RParen,

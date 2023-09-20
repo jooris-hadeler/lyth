@@ -5,7 +5,9 @@ struct User {
 }
 
 fn main() -> i32 {
-    debug(12 * 3 / 5, 3, true);
+    let res: i32;
 
-    return -1;
+    res = math.sin(12, 5);
+
+    return res;
 }

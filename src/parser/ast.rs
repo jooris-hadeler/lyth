@@ -83,6 +83,9 @@ pub enum UnaryOp {
 
 #[derive(Debug, Clone)]
 pub enum BinaryOp {
+    Assign,
+    Access,
+
     Add,
     Subtract,
     Multiply,
@@ -90,8 +93,8 @@ pub enum BinaryOp {
 
     Equals,
     Unequals,
-    Less,
-    Greater,
+    LessThan,
+    GreaterThan,
     LessEqual,
     GreaterEqual,
 
@@ -101,4 +104,7 @@ pub enum BinaryOp {
 
     LogicalAnd,
     LogicalOr,
+
+    ShiftLeft,
+    ShiftRight,
 }
