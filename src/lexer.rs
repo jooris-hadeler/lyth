@@ -94,7 +94,7 @@ impl TokenKind {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Location {
     pub file: Box<str>,
     pub start: usize,

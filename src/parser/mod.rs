@@ -3,7 +3,7 @@ use crate::parser::ast::{BinaryOp, ExprKind, Param, StmtKind, StructField, Unary
 
 use thiserror::Error;
 
-mod ast;
+pub mod ast;
 
 #[derive(Clone, Debug, Error)]
 pub enum ParserError {

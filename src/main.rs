@@ -11,6 +11,8 @@ mod parser;
 
 use crate::parser::{Parser, ParserError};
 
+mod checker;
+
 /// Lyth Compiler & Build Tool
 #[derive(ClapParser, Debug)]
 #[command(author, version, about)]
