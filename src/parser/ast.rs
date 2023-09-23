@@ -23,8 +23,25 @@ pub struct TypeDefStruct {
 
 #[derive(Debug, Clone)]
 pub struct Type {
-    pub name: Box<str>,
+    pub kind: TypeKind,
     pub loc: Location
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeKind {
+    Integer(Width, bool),
+    Boolean,
+
+    Ref(Box<TypeKind>),
+    Identifier(Box<str>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Width {
+    Byte,
+    Word,
+    DoubleWord,
+    QuadWord,
 }
 
 #[derive(Debug, Clone)]

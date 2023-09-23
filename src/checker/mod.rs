@@ -3,6 +3,7 @@ use crate::parser::ast as ast;
 
 use thiserror::Error;
 use crate::lexer::Location;
+use crate::parser::ast::{TypeKind, Width};
 
 #[derive(Debug, Clone, Error)]
 pub enum CheckerError {}
@@ -119,10 +120,13 @@ impl<'a> Checker<'a> {
 
     pub fn check_expr(&mut self, expr: &ast::Expr) -> Result<ast::Type, CheckerError> {
         Ok(ast::Type {
-            name: "i32".into(),
+            kind: TypeKind::Integer(Width::DoubleWord, true),
             loc: Location::default(),
         })
     }
+
+    // TODO: finish this function
+    pub fn is_type_compatible(&self, first: &ast::Type, second: &ast::Type) -> bool { true }
 
     fn push_scope(&mut self) {
         self.scopes.push(Scope::default());

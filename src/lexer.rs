@@ -64,6 +64,17 @@ pub enum TokenKind {
     True,
     False,
 
+    // Types
+    I8,
+    I16,
+    I32,
+    I64,
+    U8,
+    U16,
+    U32,
+    U64,
+    Bool,
+
     // Literals & Identifier
     Identifier(Box<str>),
     Integer(usize),
@@ -188,6 +199,15 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
                             "return" => TokenKind::Return,
                             "true" => TokenKind::True,
                             "false" => TokenKind::False,
+                            "i8" => TokenKind::I8,
+                            "i16" => TokenKind::I16,
+                            "i32" => TokenKind::I32,
+                            "i64" => TokenKind::I64,
+                            "u8" => TokenKind::U8,
+                            "u16" => TokenKind::U16,
+                            "u32" => TokenKind::U32,
+                            "u64" => TokenKind::U64,
+                            "bool" => TokenKind::Bool,
                             default => TokenKind::Identifier(default.into()),
                         }
                     }
