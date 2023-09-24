@@ -27,16 +27,19 @@ pub struct Type {
     pub loc: Location
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TypeKind {
     Integer(Width, bool),
     Boolean,
 
     Ref(Box<TypeKind>),
     Identifier(Box<str>),
+    Function(Vec<Type>, Option<Type>),
+
+    Void,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialOrd, Copy)]
 pub enum Width {
     Byte,
     Word,

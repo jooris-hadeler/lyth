@@ -1,9 +1,10 @@
+use std::cmp::max;
 use std::collections::HashMap;
 use crate::parser::ast as ast;
 
 use thiserror::Error;
 use crate::lexer::Location;
-use crate::parser::ast::{TypeKind, Width};
+use crate::parser::ast::{BinaryOp, Expr, ExprKind, TypeKind, UnaryOp, Width};
 
 #[derive(Debug, Clone, Error)]
 pub enum CheckerError {}
@@ -29,6 +30,11 @@ pub struct Checker<'a> {
     function_signatures: HashMap<Box<str>, (Vec<ast::Type>, Option<ast::Type>)>,
     scopes: Vec<Scope>,
 }
+
+const U8_MAX: usize = u8::MAX as usize;
+const U16_MAX: usize = u16::MAX as usize;
+const U32_MAX: usize = u32::MAX as usize;
+const U64_MAX: usize = u64::MAX as usize;
 
 impl<'a> Checker<'a> {
     pub fn new(module: &'a ast::Module) -> Self {
@@ -119,14 +125,128 @@ impl<'a> Checker<'a> {
     }
 
     pub fn check_expr(&mut self, expr: &ast::Expr) -> Result<ast::Type, CheckerError> {
-        Ok(ast::Type {
-            kind: TypeKind::Integer(Width::DoubleWord, true),
-            loc: Location::default(),
-        })
+        match &expr.kind {
+            ExprKind::Identifier(name) => self.check_identifier_expr(name),
+            ExprKind::Unary(op, expr) => self.check_unary_expr(op, expr.as_ref()),
+            ExprKind::Binary(op, left, right) => self.check_binary_expr(op, left.as_ref(), right.as_ref()),
+            ExprKind::Call(func, params) => self.check_call_expr(func.as_ref(), params),
+            ExprKind::Boolean(..) => Ok(ast::Type { kind: TypeKind::Boolean, loc: Location::default() }),
+            ExprKind::Integer(val) => {
+                let size = match *val {
+                    0..=U8_MAX => Width::Byte,
+                    0..=U16_MAX => Width::Word,
+                    0..=U32_MAX => Width::DoubleWord,
+                    0..=U64_MAX => Width::QuadWord,
+                };
+
+                Ok(ast::Type {
+                    kind: TypeKind::Integer(size, false),
+                    loc: Location::default(),
+                })
+            }
+        }
+    }
+
+    pub fn check_identifier_expr(&mut self, name: &Box<str>) -> Result<ast::Type, CheckerError> {
+        // Lookup identifier and its type
+        // TODO: check higher scopes if not found here
+        let typ = self.scopes.last().unwrap().variables.get(name);
+
+        match typ {
+            Some(typ) => match typ {
+                Some(typ) => return Ok(typ.clone()),
+                None => unimplemented!("unknown type of identifier"),
+            }
+            None => {}
+        };
+
+        // Check function signatures
+        let func = self.function_signatures.get(name);
+
+        match func {
+            Some(func) => Ok(ast::Type {
+                kind: TypeKind::Function(func.0.clone(), func.1.clone()),
+                loc: Location::default(),
+            }),
+            None => unimplemented!("no variable or function of name found")
+        }
+    }
+
+    pub fn check_unary_expr(&mut self, op: &UnaryOp, expr: &Expr) -> Result<ast::Type, CheckerError> {
+        todo!()
+    }
+
+    pub fn check_binary_expr(&mut self, op: &BinaryOp, left: &Expr, right: &Expr) -> Result<ast::Type, CheckerError> {
+        todo!()
+    }
+
+    pub fn check_call_expr(&mut self, func: &Expr, params: &Vec<Expr>) -> Result<ast::Type, CheckerError> {
+        let typ = self.check_expr(func)?;
+
+        if let TypeKind::Function(param_types, return_type) = typ {
+            for (expr, typ) in params.iter().zip(param_types.iter()) {
+                let result = self.check_expr(expr)?;
+
+                if result.kind != typ.kind {
+                    unimplemented!("types incompatible")
+                }
+            }
+
+            let kind = return_type.map_or(TypeKind::Void, |t| t.kind);
+            Ok(ast::Type {
+                kind,
+                loc: Location::default(),
+            })
+        } else {
+            unimplemented!("error not a function cant call")
+        }
     }
 
     // TODO: finish this function
-    pub fn is_type_compatible(&self, first: &ast::Type, second: &ast::Type) -> bool { true }
+    pub fn is_type_compatible(&self, first: &ast::Type, second: &ast::Type) -> bool {
+        matches!(first.kind, TypeKind::Integer(..)) && matches!(second.kind, TypeKind::Integer(..))
+            || matches!(first.kind, TypeKind::Boolean) && matches!(second.kind, TypeKind::Boolean)
+    }
+
+    pub fn get_result_type(&self, first: &ast::Type, second: &ast::Type) -> Result<ast::Type, CheckerError> {
+        let kind = self.get_result_type_kind(&first.kind, &second.kind)?;
+
+        Ok(ast::Type { kind, loc: Location::default() })
+    }
+
+    pub fn get_result_type_kind(&self, first: &TypeKind, second: &TypeKind) -> Result<TypeKind, CheckerError> {
+        match first {
+            TypeKind::Integer(width_first, signed_first) => match second {
+                TypeKind::Integer(width_second, signed_second) => {
+                    let width = max(width_first, width_second);
+                    let signed = signed_first || signed_second;
+
+                    Ok(TypeKind::Integer(width.clone(), signed))
+                }
+
+                _ => unimplemented!("incompatible types")
+            }
+            TypeKind::Boolean => match second {
+                TypeKind::Boolean => Ok(TypeKind::Boolean),
+
+                _ => unimplemented!("incompatible types")
+            }
+            TypeKind::Identifier(name_first) => match second {
+                TypeKind::Identifier(name_second) => Ok(TypeKind::Identifier(name_second.clone())),
+
+                _ => unimplemented!("incompatible types")
+            }
+            TypeKind::Ref(inner_first) => match second {
+                TypeKind::Ref(inner_second) => {
+                    let result = self.get_result_type_kind(inner_first.as_ref(), inner_second.as_ref())?;
+                    Ok(TypeKind::Ref(Box::new(result)))
+                }
+
+                _ => unimplemented!("incompatible types")
+            }
+            TypeKind::Function(..) => unimplemented!("shouldn't be used in mathematical expressions")
+        }
+    }
 
     fn push_scope(&mut self) {
         self.scopes.push(Scope::default());
