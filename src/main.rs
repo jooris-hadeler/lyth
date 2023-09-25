@@ -109,7 +109,6 @@ fn parse_file(file: String, check: bool) {
             if check {
                 let mut checker = Checker::new(&module);
 
-                // TODO: handle errors
                 match checker.check_module() {
                     Ok(()) => println!("{:#?}", module),
                     Err(err) => match err {
