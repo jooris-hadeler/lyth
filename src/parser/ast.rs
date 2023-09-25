@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use crate::lexer::Location;
 
 #[derive(Debug, Clone)]
@@ -24,7 +25,7 @@ pub struct TypeDefStruct {
 #[derive(Debug, Clone)]
 pub struct Type {
     pub kind: TypeKind,
-    pub loc: Location
+    pub loc: Location,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,12 +35,57 @@ pub enum TypeKind {
 
     Ref(Box<TypeKind>),
     Identifier(Box<str>),
-    Function(Vec<Type>, Option<Type>),
+    Function(Vec<TypeKind>, Option<Box<TypeKind>>),
 
     Void,
 }
 
-#[derive(Debug, Clone, PartialOrd, Copy)]
+impl Display for TypeKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeKind::Integer(width, signed) => {
+                if *signed {
+                    write!(f, "i")?;
+                } else {
+                    write!(f, "u")?;
+                }
+
+                match width {
+                    Width::Byte => write!(f, "8"),
+                    Width::Word => write!(f, "16"),
+                    Width::DoubleWord => write!(f, "32"),
+                    Width::QuadWord => write!(f, "64"),
+                }
+            }
+            TypeKind::Boolean => write!(f, "bool"),
+            TypeKind::Identifier(name) => write!(f, "{name}"),
+            TypeKind::Ref(typ) => write!(f, "&{typ}"),
+            TypeKind::Function(params, return_type) => {
+                write!(f, "fn(")?;
+
+                let mut first = true;
+                for param in params {
+                    if !first {
+                        write!(f, ", ")?;
+                    }
+                    first = false;
+                    write!(f, "{param}")?;
+                }
+
+                write!(f, ")")?;
+
+                if let Some(return_type) = return_type {
+                    write!(f, " -> {return_type}")?;
+                }
+
+                Ok(())
+            }
+            TypeKind::Void => write!(f, "void")
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialOrd, PartialEq, Ord, Eq, Copy)]
 pub enum Width {
     Byte,
     Word,
@@ -92,7 +138,7 @@ pub enum ExprKind {
     Boolean(bool),
     Identifier(Box<str>),
     Unary(UnaryOp, Box<Expr>),
-    Binary(BinaryOp, Box<Expr>, Box<Expr>)
+    Binary(BinaryOp, Box<Expr>, Box<Expr>),
 }
 
 #[derive(Debug, Clone)]

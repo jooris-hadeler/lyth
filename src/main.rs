@@ -1,6 +1,7 @@
 use std::fs;
 use std::process::exit;
 use clap::{Parser as ClapParser, Subcommand};
+use crate::checker::{Checker, CheckerError};
 
 mod lexer;
 
@@ -35,7 +36,10 @@ enum SubCommands {
     /// Parse a single file and print out the ast
     Parse {
         /// The file to parse
-        file: String
+        file: String,
+        /// If the file should be type checked
+        #[arg(short, long, default_value_t = false)]
+        check: bool,
     },
     /// Compile a single file
     Compile {
@@ -71,7 +75,7 @@ fn lex_file(file: String) {
     }
 }
 
-fn parse_file(file: String) {
+fn parse_file(file: String, check: bool) {
     let content = fs::read_to_string(&file).unwrap();
 
     let tokens = lex(&file, content.chars().peekable());
@@ -99,14 +103,50 @@ fn parse_file(file: String) {
 
     let ast = parser.parse_module();
 
+
     match ast {
-        Ok(module) => println!("{:#?}", module),
+        Ok(module) => {
+            if check {
+                let mut checker = Checker::new(&module);
+
+                // TODO: handle errors
+                match checker.check_module() {
+                    Ok(()) => println!("{:#?}", module),
+                    Err(err) => match err {
+                        CheckerError::Custom(msg) => eprintln!("ERROR: {msg}"),
+                        CheckerError::LocatedCustom { loc, msg} => {
+                            let (line, col) = calculate_pos(&loc, &content);
+
+                            eprintln!("{}:{}:{}: ERROR: {}", loc.file, line, col, msg);
+                        },
+                        CheckerError::Lookup { loc, name } => {
+                            let (line, col) = calculate_pos(&loc, &content);
+
+                            eprintln!("{}:{}:{}: ERROR: unknown variable or function with name `{}`",
+                                      loc.file, line, col, name);
+                        },
+                        CheckerError::Incompatible { loc, first, second } => {
+                            let (line, col) = calculate_pos(&loc, &content);
+
+                            eprintln!("{}:{}:{}: ERROR: types `{}` and `{}` are incompatible",
+                                      loc.file, line, col, first, second);
+                        },
+                        CheckerError::TypeMismatch { loc, first, second } => {
+                            let (line, col) = calculate_pos(&loc, &content);
+
+                            eprintln!("{}:{}:{}: ERROR: type mismatch `{}` and `{}`",
+                                      loc.file, line, col, first, second);
+                        }
+                    }
+                }
+            }
+        }
         Err(error) => match error {
             ParserError::Message(msg) => eprintln!("ERROR: {msg}"),
             ParserError::LocatedError { loc, msg } => {
                 let (line, col) = calculate_pos(&loc, &content);
 
-                eprintln!("ERROR: {}:{}:{}: {}", loc.file, line, col, msg);
+                eprintln!("{}:{}:{}: ERROR: {}", loc.file, line, col, msg);
             }
         }
     }
@@ -117,7 +157,7 @@ fn main() {
 
     match cli.command {
         SubCommands::Lex { file } => lex_file(file),
-        SubCommands::Parse { file } => parse_file(file),
+        SubCommands::Parse { file, check } => parse_file(file, check),
         SubCommands::Compile { file, output } => println!("{file} -> {output:?}")
     }
 }

@@ -1,9 +1,9 @@
-use crate::lexer::{Location, Token, TokenKind};
-use crate::parser::ast::{BinaryOp, ExprKind, Param, StmtKind, StructField, TypeKind, UnaryOp, Width};
-
 use thiserror::Error;
 
+use crate::lexer::{Location, Token, TokenKind};
+
 pub mod ast;
+use crate::parser::ast::{BinaryOp, ExprKind, Param, StmtKind, StructField, TypeKind, UnaryOp, Width};
 
 #[derive(Clone, Debug, Error)]
 pub enum ParserError {
