@@ -23,8 +23,28 @@ pub struct TypeDefStruct {
 
 #[derive(Debug, Clone)]
 pub struct Type {
-    pub name: Box<str>,
-    pub loc: Location
+    pub kind: TypeKind,
+    pub loc: Location,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeKind {
+    Integer(Width, bool),
+    Boolean,
+
+    Ref(Box<TypeKind>),
+    Identifier(Box<str>),
+    Function(Vec<TypeKind>, Option<Box<TypeKind>>),
+
+    Void,
+}
+
+#[derive(Debug, Clone, PartialOrd, PartialEq, Ord, Eq, Copy)]
+pub enum Width {
+    Byte,
+    Word,
+    DoubleWord,
+    QuadWord,
 }
 
 #[derive(Debug, Clone)]
@@ -54,7 +74,7 @@ pub struct Stmt {
 
 #[derive(Debug, Clone)]
 pub enum StmtKind {
-    Let(Box<str>, Option<Type>, Option<Expr>),
+    Let(Box<str>, Type, Option<Expr>),
     Return(Option<Expr>),
     Expr(Expr),
 }
@@ -68,7 +88,7 @@ pub struct Expr {
 #[derive(Debug, Clone)]
 pub enum ExprKind {
     Call(Box<Expr>, Vec<Expr>),
-    Integer(usize),
+    Integer(usize, bool),
     Boolean(bool),
     Identifier(Box<str>),
     Unary(UnaryOp, Box<Expr>),
@@ -107,4 +127,23 @@ pub enum BinaryOp {
 
     ShiftLeft,
     ShiftRight,
+}
+
+pub trait ASTVisitor {
+    type Error;
+
+    type TypeDefReturn;
+    fn visit_type_def(&mut self, type_def: &TypeDef) -> Result<Self::TypeDefReturn, Self::Error>;
+
+    type FuncDefReturn;
+    fn visit_func_def(&mut self, func_def: &FuncDef) -> Result<Self::FuncDefReturn, Self::Error>;
+
+    type BlockReturn;
+    fn visit_block(&mut self, block: &Block) -> Result<Self::BlockReturn, Self::Error>;
+
+    type StmtReturn;
+    fn visit_stmt(&mut self, stmt: &Stmt) -> Result<Self::StmtReturn, Self::Error>;
+
+    type ExprReturn;
+    fn visit_expr(&mut self, expr: &Expr) -> Result<Self::ExprReturn, Self::Error>;
 }

@@ -66,8 +66,19 @@ pub enum TokenKind {
 
     // Literals & Identifier
     Identifier(Box<str>),
-    Integer(usize),
+    Integer(usize, bool),
     String(Box<str>),
+
+    // Types
+    I8,
+    I16,
+    I32,
+    I64,
+    U8,
+    U16,
+    U32,
+    U64,
+    Bool,
 
     // Misc
     Illegal(Box<str>),
@@ -188,6 +199,15 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
                             "return" => TokenKind::Return,
                             "true" => TokenKind::True,
                             "false" => TokenKind::False,
+                            "i8" => TokenKind::I8,
+                            "i16" => TokenKind::I16,
+                            "i32" => TokenKind::I32,
+                            "i64" => TokenKind::I64,
+                            "u8" => TokenKind::U8,
+                            "u16" => TokenKind::U16,
+                            "u32" => TokenKind::U32,
+                            "u64" => TokenKind::U64,
+                            "bool" => TokenKind::Bool,
                             default => TokenKind::Identifier(default.into()),
                         }
                     }
@@ -203,24 +223,29 @@ pub fn lex(path: &str, mut content: Peekable<Chars<'_>>) -> Vec<Token> {
                             pos += 1;
                         }
 
+                        let unsigned = content.peek().is_some_and(|c| *c == 'u' || *c == 'U');
+                        if unsigned {
+                            content.next();
+                        }
+
                         if number.starts_with("0x") {
                             match usize::from_str_radix(&number[2..], 16) {
-                                Ok(value) => TokenKind::Integer(value),
+                                Ok(value) => TokenKind::Integer(value, unsigned),
                                 Err(_) => TokenKind::Illegal("Invalid integer literal.".into()),
                             }
                         } else if number.starts_with("0b") {
                             match usize::from_str_radix(&number[2..], 2) {
-                                Ok(value) => TokenKind::Integer(value),
+                                Ok(value) => TokenKind::Integer(value, unsigned),
                                 Err(_) => TokenKind::Illegal("Invalid integer literal.".into()),
                             }
                         } else if number.starts_with("0o") {
                             match usize::from_str_radix(&number[2..], 8) {
-                                Ok(value) => TokenKind::Integer(value),
+                                Ok(value) => TokenKind::Integer(value, unsigned),
                                 Err(_) => TokenKind::Illegal("Invalid integer literal.".into()),
                             }
                         } else {
                             match number.parse() {
-                                Ok(value) => TokenKind::Integer(value),
+                                Ok(value) => TokenKind::Integer(value, unsigned),
                                 Err(_) => TokenKind::Illegal("Invalid integer literal.".into()),
                             }
                         }

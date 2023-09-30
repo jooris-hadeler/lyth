@@ -1,9 +1,9 @@
 use crate::lexer::{Location, Token, TokenKind};
-use crate::parser::ast::{BinaryOp, ExprKind, Param, StmtKind, StructField, UnaryOp};
+use crate::parser::ast::{BinaryOp, ExprKind, Param, StmtKind, StructField, TypeKind, UnaryOp, Width};
 
 use thiserror::Error;
 
-mod ast;
+pub mod ast;
 
 #[derive(Clone, Debug, Error)]
 pub enum ParserError {
@@ -123,7 +123,7 @@ impl Parser {
     fn try_consume_identifier<S: Into<Box<str>>>(&mut self, msg: S) -> Result<(Box<str>, Location), ParserError> {
         let token = self.try_consume_predicate_with_error(
             |tok| matches!(tok.kind, TokenKind::Identifier(..)),
-            msg.into()
+            msg.into(),
         )?;
 
         let name = token.kind.unwrap_identifier();
@@ -260,9 +260,47 @@ impl Parser {
 
     /// This function parses a type.
     pub fn parse_type(&mut self) -> Result<ast::Type, ParserError> {
-        let (name, loc) = self.try_consume_identifier("expected identifier as type")?;
+        if self.is_peek(0, TokenKind::Ampersand) {
+            self.consume()?;
+            let (kind, loc) = self.parse_type_kind()?;
 
-        Ok(ast::Type { name, loc })
+            Ok(ast::Type { kind: TypeKind::Ref(Box::new(kind)), loc })
+        } else {
+            let (kind, loc) = self.parse_type_kind()?;
+
+            Ok(ast::Type { kind, loc })
+        }
+    }
+
+    pub fn parse_type_kind(&mut self) -> Result<(ast::TypeKind, Location), ParserError> {
+        match self.peek(0) {
+            Some(tok) => {
+                let kind = match tok.kind {
+                    TokenKind::I8 => TypeKind::Integer(Width::Byte, true),
+                    TokenKind::I16 => TypeKind::Integer(Width::Word, true),
+                    TokenKind::I32 => TypeKind::Integer(Width::DoubleWord, true),
+                    TokenKind::I64 => TypeKind::Integer(Width::QuadWord, true),
+
+                    TokenKind::U8 => TypeKind::Integer(Width::Byte, false),
+                    TokenKind::U16 => TypeKind::Integer(Width::Word, false),
+                    TokenKind::U32 => TypeKind::Integer(Width::DoubleWord, false),
+                    TokenKind::U64 => TypeKind::Integer(Width::QuadWord, false),
+
+                    TokenKind::Bool => TypeKind::Boolean,
+                    TokenKind::Identifier(name) => TypeKind::Identifier(name.clone()),
+
+                    _ => return Err(ParserError::LocatedError {
+                        msg: "expected type".into(),
+                        loc: tok.loc.clone(),
+                    })
+                };
+
+                self.consume()?;
+
+                Ok((kind, tok.loc.clone()))
+            }
+            None => Err(ParserError::Message("unexpected end of file".into()))
+        }
     }
 
     /// This function parses a block.
@@ -312,12 +350,8 @@ impl Parser {
 
         let (name, loc) = self.try_consume_identifier("expected identifier after `fn` keyword")?;
 
-        let typ = if self.is_peek(0, TokenKind::Colon) {
-            self.consume()?;
-            Some(self.parse_type()?)
-        } else {
-            None
-        };
+        self.try_consume(TokenKind::Colon)?;
+        let typ = self.parse_type()?;
 
         let expr = if self.is_peek(0, TokenKind::SemiColon) {
             self.consume()?;
@@ -503,13 +537,13 @@ impl Parser {
             "expected integer literal",
         )?;
 
-        let value = match tok.kind {
-            TokenKind::Integer(value) => value,
+        let (value, unsigned) = match tok.kind {
+            TokenKind::Integer(value, signed) => (value, signed),
             _ => unreachable!(),
         };
 
         Ok(ast::Expr {
-            kind: ExprKind::Integer(value),
+            kind: ExprKind::Integer(value, unsigned),
             loc: tok.loc.clone(),
         })
     }

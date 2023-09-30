@@ -8,6 +8,7 @@ use crate::lexer::{lex, Token};
 use crate::lexer::{Location, TokenKind};
 
 mod parser;
+mod typesystem;
 
 use crate::parser::{Parser, ParserError};
 
